@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QLabel, QLineEdit, QPushButton, QHBoxLayout, QTableWidget, QTableWidgetItem, QDialog
+from PyQt5.QtWidgets import QApplication, QFileDialog, QMainWindow, QVBoxLayout, QWidget, QLabel, QLineEdit, QPushButton, QHBoxLayout, QTableWidget, QTableWidgetItem, QDialog
 from PyQt5 import QtCore as qtc
 
 class Register:
@@ -11,7 +11,7 @@ class Register:
         self.fields.append(fields) #add widget to add fields to 32-bit reg, will be dict with {size,field_name}, add check to make sure in range
         self.access = access #available options are rw, ro, wo wrc. Any others will throw error
 
-class AnotherWindow(QWidget):
+class add_block_window(QWidget):
     submitClicked = qtc.pyqtSignal(list)
     """
     This "window" is a QWidget. If it has no parent, it
@@ -23,8 +23,8 @@ class AnotherWindow(QWidget):
         self.layout = QVBoxLayout()
         self.label = QLabel("Another Window")
         self.registers_table = QTableWidget()
-        self.registers_table.setColumnCount(3)
-        self.registers_table.setHorizontalHeaderLabels(["Address", "Name", "Size"])
+        self.registers_table.setColumnCount(6)
+        self.registers_table.setHorizontalHeaderLabels(["Address", "Name", "Size", "Description", "Fields", "Access"])
         self.btn = QPushButton("Submit")
         self.layout.addWidget(self.btn)
         self.btn.clicked.connect(self.confirm)
@@ -44,7 +44,7 @@ class AnotherWindow(QWidget):
     def add_register_dialog(self):
         dialog = AddRegisterDialog()
         if dialog.exec_():
-            self.registers.append(Register(dialog.name, dialog.size))
+            self.registers.append(Register(dialog.name, dialog.size, dialog.desc, dialog.fields, dialog.access))
             self.update_register_table()
 
     def create_buttons(self):
@@ -67,7 +67,6 @@ class AnotherWindow(QWidget):
             self.registers_table.setItem(i, 5, QTableWidgetItem(str(register.access)))
 
 
-
 class RegisterMapGUI(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -86,13 +85,38 @@ class RegisterMapGUI(QMainWindow):
 
         self.create_register_map_widgets()
         self.create_buttons()
+
+    def save_project(self):
+        filename, _ = QFileDialog.getSaveFileName(self, "Save Project", "", "Project Files (*.proj)")
+        if filename:
+            with open(filename, "w") as file:
+                for reg in self.registers:
+                    file.write(f"{reg.name},{reg.size},{reg.desc},{reg.fields},{reg.access}\n")
+            self.output_label.setText(f"Project saved to '{filename}'")
+
+    def load_project(self):
+            filename, _ = QFileDialog.getOpenFileName(self, "Load Project", "", "Project Files (*.proj)")
+            if filename:
+                self.registers = []
+                with open(filename, "r") as file:
+                    for line in file:
+                        parts = line.strip().split(",")
+                        name = parts[0]
+                        size = parts[1]
+                        desc = parts[2]
+                        fields = parts[3]
+                        access = parts[4]
+                        self.registers.append(Register(name, size, desc, fields, access))
+                self.registers_table.clear()
+                self.update_register_table()
+                self.output_label.setText(f"Project loaded from '{filename}'")
     
-    def show_sub_window(self):  # <-- Here, we create *and connect* the sub window's signal to the main window's slot
-        self.sub_window = AnotherWindow()
-        self.sub_window.submitClicked.connect(self.on_sub_window_confirm)
+    def show_add_block(self):  # <-- Here, we create *and connect* the sub window's signal to the main window's slot
+        self.sub_window = add_block_window()
+        self.sub_window.submitClicked.connect(self.on_add_block_confirm)
         self.sub_window.show()
     
-    def on_sub_window_confirm(self, regs):  # <-- This is the main window's slot
+    def on_add_block_confirm(self, regs):  # <-- This is the main window's slot
         self.from_subwindow = regs
         print(self.from_subwindow)
         self.registers.append(regs)
@@ -120,8 +144,7 @@ class RegisterMapGUI(QMainWindow):
         self.button_layout.addWidget(self.add_register_button)
 
         self.add_block_button = QPushButton("Add Block")
-        #self.add_block_button.clicked.connect(self.add_block_window)
-        self.add_block_button.clicked.connect(self.show_sub_window)
+        self.add_block_button.clicked.connect(self.show_add_block)
         self.button_layout.addWidget(self.add_block_button)
 
         self.copy_button = QPushButton("Copy")
@@ -136,12 +159,24 @@ class RegisterMapGUI(QMainWindow):
         self.delete_button.clicked.connect(self.delete_selected)
         self.button_layout.addWidget(self.delete_button)
 
+        self.btn_save_project = QPushButton("Save Project")
+        self.btn_save_project.clicked.connect(self.save_project)
+        self.button_layout.addWidget(self.btn_save_project)
+        
+        self.btn_load_project = QPushButton("Load Project")
+        self.btn_load_project.clicked.connect(self.load_project)
+        self.button_layout.addWidget(self.btn_load_project)
+
+        self.output_label = QLabel("")
+        self.button_layout.addWidget(self.output_label)
+
         self.layout.addLayout(self.button_layout)
 
     def add_register_dialog(self):
         dialog = AddRegisterDialog()
         if dialog.exec_():
             self.registers.append(Register(dialog.name, dialog.size, dialog.desc, dialog.fields, dialog.access))
+            self.output_label.setText(f"Added register {dialog.name}")
             self.update_register_table()
 
     def update_register_table(self):
@@ -172,16 +207,12 @@ class RegisterMapGUI(QMainWindow):
         self.update_register_table()
 
     def copy_selected(self):
-        # for reg in self.registers:
-        #     print('dumping registers')
-        #     print(reg.name)
         self.copied_regs = []
         selected_indexes = self.registers_table.selectionModel().selectedRows()
         for index in sorted(selected_indexes, key=lambda x: x.row(), reverse=True):
             self.copied_regs.append(self.registers[index.row()])
             print('index.row() =  {}'.format(index.row()))
             print('Copying {} at location {}'.format(self.registers[index.row()].name, index.row())) 
-            #i think this is erroring because its inserting a list from the paste
     
     def paste_selected(self):
         selected_indexes = self.registers_table.selectionModel().selectedRows()
@@ -189,7 +220,6 @@ class RegisterMapGUI(QMainWindow):
             print('paste index.row() =  {}'.format(index.row()))
             row = index.row()
             break
-        #print('Printing at location {}'.format(self.copied_regs.name, index.row()))
         for reg in self.copied_regs:
             self.registers.insert(row,reg)
         self.update_register_table()
@@ -251,44 +281,6 @@ class AddRegisterDialog(QDialog):
     def access(self):
         return self.access_input.text()
     
-
-class AddBlockDialog(QDialog):
-    def __init__(self, registers):
-        super().__init__()
-        self.setWindowTitle("Add Block")
-        self.layout = QVBoxLayout()
-
-        self.name_label = QLabel("Block Name:")
-        self.name_input = QLineEdit()
-        self.layout.addWidget(self.name_label)
-        self.layout.addWidget(self.name_input)
-
-        self.registers_label = QLabel("Registers (comma-separated):")
-        self.registers_input = QLineEdit()
-        self.layout.addWidget(self.registers_label)
-        self.layout.addWidget(self.registers_input)
-
-        self.add_button = QPushButton("Add")
-        self.add_button.clicked.connect(self.accept)
-        self.layout.addWidget(self.add_button)
-
-        self.button = QPushButton("Push To Add Register")
-        self.button.clicked.connect(self.show_new_window)
-        self.layout.addWidget(self.button)
-
-        self.setLayout(self.layout)
-
-    def show_new_window(self, checked):
-        self.w = AnotherWindow()
-        self.w.show()
-
-    @property
-    def name(self):
-        return self.name_input.text()
-
-    @property
-    def registers(self):
-        return [reg.strip() for reg in self.registers_input.text().split(",")]
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
