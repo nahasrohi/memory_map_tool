@@ -2,14 +2,37 @@ import sys
 from PyQt5.QtWidgets import QApplication, QFileDialog, QMainWindow, QVBoxLayout, QWidget, QLabel, QLineEdit, QPushButton, QHBoxLayout, QTableWidget, QTableWidgetItem, QDialog
 from PyQt5 import QtCore as qtc
 
+#trying out creating a block class
+class Block:
+    def __init__(self, name, desc):
+        self.name = name
+        self.desc = desc
+        self.registers = [] # List of register objects
+
+    def add_register(self, name, size, desc, fields, access):
+        self.registers.append(Register(name, size, desc, fields, access))
+
+    def update_block(self, name, desc):
+        self.name = name
+        self.desc = desc
+
+
 class Register:
     def __init__(self, name, size, desc, fields, access):
         self.name = name
         self.size = size
         self.desc = desc
-        self.fields = []
-        self.fields.append(fields) #add widget to add fields to 32-bit reg, will be dict with {size,field_name}, add check to make sure in range
+        self.fields = {fields} # dictionary, use syntax '31-16' : 'some field', '15-0' : 'some other field' 
+        #self.fields.append(fields) #add widget to add fields to 32-bit reg, will be dict with {size,field_name}, add check to make sure in range
         self.access = access #available options are rw, ro, wo wrc. Any others will throw error
+    
+    def update_reg(self, name, size, desc, fields, access):
+        self.name = name
+        self.size = size
+        self.desc = desc
+        self.fields = {fields}
+        self.access = access
+
 
 class add_block_window(QWidget):
     submitClicked = qtc.pyqtSignal(list)
@@ -73,7 +96,7 @@ class RegisterMapGUI(QMainWindow):
         self.setWindowTitle("FPGA Register Map Tool")
         self.setGeometry(100, 100, 800, 600)
 
-        self.registers = []
+        self.registers = [] #list of register and block objects
         self.blocks = []
         self.copied_regs = []
 
@@ -184,13 +207,14 @@ class RegisterMapGUI(QMainWindow):
         offset = 0
         for i, register in enumerate(self.registers):
             if type(register) is list:
-                for j, register in enumerate(register):
+                for j, reg in enumerate(register):
+                    print('block found')
                     self.registers_table.setItem(j+i, 0, QTableWidgetItem(str(j)))  # Address
-                    self.registers_table.setItem(j+i, 1, QTableWidgetItem(register.name))
-                    self.registers_table.setItem(j+i, 2, QTableWidgetItem(str(register.size)))
-                    self.registers_table.setItem(j+i, 3, QTableWidgetItem(register.desc))
-                    self.registers_table.setItem(j+i, 4, QTableWidgetItem(str(register.fields)))
-                    self.registers_table.setItem(j+i, 5, QTableWidgetItem(str(register.access)))
+                    self.registers_table.setItem(j+i, 1, QTableWidgetItem(reg.name))
+                    self.registers_table.setItem(j+i, 2, QTableWidgetItem(str(reg.size)))
+                    self.registers_table.setItem(j+i, 3, QTableWidgetItem(reg.desc))
+                    self.registers_table.setItem(j+i, 4, QTableWidgetItem(str(reg.fields)))
+                    self.registers_table.setItem(j+i, 5, QTableWidgetItem(str(reg.access)))
                     offset = j
             else:
                 self.registers_table.setItem(i+offset, 0, QTableWidgetItem(str(i)))  # Address
