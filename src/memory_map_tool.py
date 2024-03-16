@@ -2,15 +2,17 @@ import sys
 from PyQt5.QtWidgets import QApplication, QFileDialog, QMainWindow, QVBoxLayout, QWidget, QLabel, QLineEdit, QPushButton, QHBoxLayout, QTableWidget, QTableWidgetItem, QDialog
 from PyQt5 import QtCore as qtc
 
-#trying out creating a block class
 class Block:
     def __init__(self, name, desc):
         self.name = name
         self.desc = desc
         self.registers = [] # List of register objects
 
-    def add_register(self, name, size, desc, fields, access):
-        self.registers.append(Register(name, size, desc, fields, access))
+    def add_register(self, reg):
+        if type(reg) is Register:
+            self.registers.append(reg)
+        else:
+            print('item added to block is not of type Register')
 
     def update_block(self, name, desc):
         self.name = name
@@ -30,12 +32,19 @@ class Register:
         self.name = name
         self.size = size
         self.desc = desc
-        self.fields = {fields}
+        self.fields = fields
         self.access = access
+    
+    def print_reg(self):
+        print('Register Name: {}'.format(self.name))
+        print('Register Size: {}'.format(self.size))
+        print('Register Description: {}'.format(self.desc))
+        print('Register Fields: {}'.format(self.fields))
+        print('Register Access: {}'.format(self.access))
 
 
 class add_block_window(QWidget):
-    submitClicked = qtc.pyqtSignal(list)
+    submitClicked = qtc.pyqtSignal(Block)
     """
     This "window" is a QWidget. If it has no parent, it
     will appear as a free-floating window as we want.
@@ -58,7 +67,10 @@ class add_block_window(QWidget):
 
     def confirm(self):  # <-- Here, the signal is emitted *along with the data we want*
         print(self.registers)
-        self.submitClicked.emit(self.registers)
+        new_block = Block(self.block_name_entry.text(), self.block_desc_entry.text())
+        for item in self.registers:
+            new_block.add_register(item)
+        self.submitClicked.emit(new_block)
         self.close()
         
     def get_block_regs(self):
@@ -72,11 +84,17 @@ class add_block_window(QWidget):
 
     def create_buttons(self):
         self.button_layout = QHBoxLayout()
-
         self.add_register_button = QPushButton("Add Register")
         self.add_register_button.clicked.connect(self.add_register_dialog)
         self.button_layout.addWidget(self.add_register_button)
-
+        self.block_name_label = QLabel("Block Name:")
+        self.button_layout.addWidget(self.block_name_label)
+        self.block_name_entry = QLineEdit()
+        self.button_layout.addWidget(self.block_name_entry)
+        self.desc_label = QLabel("Block Description:")
+        self.button_layout.addWidget(self.desc_label)
+        self.block_desc_entry = QLineEdit()
+        self.button_layout.addWidget(self.block_desc_entry)
         self.layout.addLayout(self.button_layout)
 
     def update_register_table(self):
@@ -139,10 +157,10 @@ class RegisterMapGUI(QMainWindow):
         self.sub_window.submitClicked.connect(self.on_add_block_confirm)
         self.sub_window.show()
     
-    def on_add_block_confirm(self, regs):  # <-- This is the main window's slot
-        self.from_subwindow = regs
+    def on_add_block_confirm(self, block):  # <-- This is the main window's slot
+        self.from_subwindow = block
         print(self.from_subwindow)
-        self.registers.append(regs)
+        self.registers.append(block)
         # for reg in regs:
         #     print(reg.name)
         #     self.registers.append(Register(reg.name, reg.size))
@@ -202,27 +220,55 @@ class RegisterMapGUI(QMainWindow):
             self.output_label.setText(f"Added register {dialog.name}")
             self.update_register_table()
 
+    # def update_register_table(self):
+    #     self.registers_table.setRowCount(len(self.registers))
+    #     offset = 0
+    #     for i, register in enumerate(self.registers):
+    #         if type(register) is Block:
+    #             for j, reg in enumerate(register.registers):
+    #                 print('block found')
+    #                 print(j+i)
+    #                 reg.print_reg()
+    #                 self.registers_table.setItem(j+i, 0, QTableWidgetItem(str(j+i)))  # Address
+    #                 self.registers_table.setItem(j+i, 1, QTableWidgetItem(reg.name))
+    #                 self.registers_table.setItem(j+i, 2, QTableWidgetItem(str(reg.size)))
+    #                 self.registers_table.setItem(j+i, 3, QTableWidgetItem(reg.desc))
+    #                 self.registers_table.setItem(j+i, 4, QTableWidgetItem(str(reg.fields)))
+    #                 self.registers_table.setItem(j+i, 5, QTableWidgetItem(str(reg.access)))
+    #                 offset = j
+    #         else:
+    #             self.registers_table.setItem(i+offset, 0, QTableWidgetItem(str(i)))  # Address
+    #             self.registers_table.setItem(i+offset, 1, QTableWidgetItem(register.name))
+    #             self.registers_table.setItem(i+offset, 2, QTableWidgetItem(str(register.size)))
+    #             self.registers_table.setItem(i+offset, 3, QTableWidgetItem(register.desc))
+    #             self.registers_table.setItem(i+offset, 4, QTableWidgetItem(str(register.fields)))
+    #             self.registers_table.setItem(i+offset, 5, QTableWidgetItem(str(register.access)))
+            
     def update_register_table(self):
         self.registers_table.setRowCount(len(self.registers))
         offset = 0
-        for i, register in enumerate(self.registers):
-            if type(register) is list:
-                for j, reg in enumerate(register):
+        line = 0
+        for register in self.registers:
+            if type(register) is Block:
+                for reg in register.registers:
                     print('block found')
-                    self.registers_table.setItem(j+i, 0, QTableWidgetItem(str(j)))  # Address
-                    self.registers_table.setItem(j+i, 1, QTableWidgetItem(reg.name))
-                    self.registers_table.setItem(j+i, 2, QTableWidgetItem(str(reg.size)))
-                    self.registers_table.setItem(j+i, 3, QTableWidgetItem(reg.desc))
-                    self.registers_table.setItem(j+i, 4, QTableWidgetItem(str(reg.fields)))
-                    self.registers_table.setItem(j+i, 5, QTableWidgetItem(str(reg.access)))
-                    offset = j
+                    #print(j+i)
+                    reg.print_reg()
+                    self.registers_table.setItem(line, 0, QTableWidgetItem(str(line)))  # Address
+                    self.registers_table.setItem(line, 1, QTableWidgetItem(reg.name))
+                    self.registers_table.setItem(line, 2, QTableWidgetItem(str(reg.size)))
+                    self.registers_table.setItem(line, 3, QTableWidgetItem(reg.desc))
+                    self.registers_table.setItem(line, 4, QTableWidgetItem(str(reg.fields)))
+                    self.registers_table.setItem(line, 5, QTableWidgetItem(str(reg.access)))
+                    line = line + 1
             else:
-                self.registers_table.setItem(i+offset, 0, QTableWidgetItem(str(i)))  # Address
-                self.registers_table.setItem(i+offset, 1, QTableWidgetItem(register.name))
-                self.registers_table.setItem(i+offset, 2, QTableWidgetItem(str(register.size)))
-                self.registers_table.setItem(i+offset, 3, QTableWidgetItem(register.desc))
-                self.registers_table.setItem(i+offset, 4, QTableWidgetItem(str(register.fields)))
-                self.registers_table.setItem(i+offset, 5, QTableWidgetItem(str(register.access)))
+                self.registers_table.setItem(line, 0, QTableWidgetItem(str(line)))  # Address
+                self.registers_table.setItem(line, 1, QTableWidgetItem(register.name))
+                self.registers_table.setItem(line, 2, QTableWidgetItem(str(register.size)))
+                self.registers_table.setItem(line, 3, QTableWidgetItem(register.desc))
+                self.registers_table.setItem(line, 4, QTableWidgetItem(str(register.fields)))
+                self.registers_table.setItem(line, 5, QTableWidgetItem(str(register.access)))
+                line = line + 1
 
     def delete_selected(self):
         selected_indexes = self.registers_table.selectionModel().selectedRows()
