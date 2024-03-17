@@ -41,6 +41,10 @@ class Register:
         print('Register Description: {}'.format(self.desc))
         print('Register Fields: {}'.format(self.fields))
         print('Register Access: {}'.format(self.access))
+    
+    def get_reg_values(self):
+        value_list = [self.name, self.size, self.desc, self.fields, self.access]
+        return value_list
 
 
 class add_block_window(QWidget):
@@ -131,8 +135,14 @@ class RegisterMapGUI(QMainWindow):
         filename, _ = QFileDialog.getSaveFileName(self, "Save Project", "", "Project Files (*.proj)")
         if filename:
             with open(filename, "w") as file:
-                for reg in self.registers:
-                    file.write(f"{reg.name},{reg.size},{reg.desc},{reg.fields},{reg.access}\n")
+                for item in self.registers:
+                    if type(item) == Block:
+                        blk_list = []
+                        for blk_item in item.registers:
+                            blk_list.append(blk_item.get_reg_values())
+                        file.write(f"{'block'},{item.name},{item.desc},{blk_list}\n")
+                    else:
+                        file.write(f"{'register'},{item.name},{item.size},{item.desc},{item.fields},{item.access}\n")
             self.output_label.setText(f"Project saved to '{filename}'")
 
     def load_project(self):
@@ -219,30 +229,6 @@ class RegisterMapGUI(QMainWindow):
             self.registers.append(Register(dialog.name, dialog.size, dialog.desc, dialog.fields, dialog.access))
             self.output_label.setText(f"Added register {dialog.name}")
             self.update_register_table()
-
-    # def update_register_table(self):
-    #     self.registers_table.setRowCount(len(self.registers))
-    #     offset = 0
-    #     for i, register in enumerate(self.registers):
-    #         if type(register) is Block:
-    #             for j, reg in enumerate(register.registers):
-    #                 print('block found')
-    #                 print(j+i)
-    #                 reg.print_reg()
-    #                 self.registers_table.setItem(j+i, 0, QTableWidgetItem(str(j+i)))  # Address
-    #                 self.registers_table.setItem(j+i, 1, QTableWidgetItem(reg.name))
-    #                 self.registers_table.setItem(j+i, 2, QTableWidgetItem(str(reg.size)))
-    #                 self.registers_table.setItem(j+i, 3, QTableWidgetItem(reg.desc))
-    #                 self.registers_table.setItem(j+i, 4, QTableWidgetItem(str(reg.fields)))
-    #                 self.registers_table.setItem(j+i, 5, QTableWidgetItem(str(reg.access)))
-    #                 offset = j
-    #         else:
-    #             self.registers_table.setItem(i+offset, 0, QTableWidgetItem(str(i)))  # Address
-    #             self.registers_table.setItem(i+offset, 1, QTableWidgetItem(register.name))
-    #             self.registers_table.setItem(i+offset, 2, QTableWidgetItem(str(register.size)))
-    #             self.registers_table.setItem(i+offset, 3, QTableWidgetItem(register.desc))
-    #             self.registers_table.setItem(i+offset, 4, QTableWidgetItem(str(register.fields)))
-    #             self.registers_table.setItem(i+offset, 5, QTableWidgetItem(str(register.access)))
             
     def update_register_table(self):
         # Iterate through 'nested' list to find length
