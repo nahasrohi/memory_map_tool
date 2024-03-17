@@ -1,6 +1,8 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QFileDialog, QMainWindow, QVBoxLayout, QWidget, QLabel, QLineEdit, QPushButton, QHBoxLayout, QTableWidget, QTableWidgetItem, QDialog
 from PyQt5 import QtCore as qtc
+import ast
+
 
 class Block:
     def __init__(self, name, desc):
@@ -140,9 +142,9 @@ class RegisterMapGUI(QMainWindow):
                         blk_list = []
                         for blk_item in item.registers:
                             blk_list.append(blk_item.get_reg_values())
-                        file.write(f"{'block'},{item.name},{item.desc},{blk_list}\n")
+                        file.write(f"{'block'}:{item.name}:{item.desc}:{blk_list}\n")
                     else:
-                        file.write(f"{'register'},{item.name},{item.size},{item.desc},{item.fields},{item.access}\n")
+                        file.write(f"{'register'}:{item.name}:{item.size}:{item.desc}:{item.fields}:{item.access}\n")
             self.output_label.setText(f"Project saved to '{filename}'")
 
     def load_project(self):
@@ -151,14 +153,28 @@ class RegisterMapGUI(QMainWindow):
                 self.registers = []
                 with open(filename, "r") as file:
                     for line in file:
-                        parts = line.strip().split(",")
-                        name = parts[0]
-                        size = parts[1]
-                        desc = parts[2]
-                        fields = parts[3]
-                        access = parts[4]
-                        self.registers.append(Register(name, size, desc, fields, access))
-                self.registers_table.clear()
+                        parts = line.strip().split(":")
+                        if parts[0] == 'block':
+                            reg_list = []
+                            name = parts[1]
+                            desc = parts[2]
+                            new_block = Block(name, desc)
+                            reg_arr = []
+                            reg_arr.append(ast.literal_eval(parts[3]))
+                            for item in reg_arr:
+                                for reg_values in item:
+                                    reg_list.append(Register(reg_values[0], reg_values[1], reg_values[2], str(reg_values[3]), reg_values[4]))
+                            for reg in reg_list:
+                                new_block.add_register(reg)
+                            self.registers.append(new_block)
+                        else:
+                            name = parts[1]
+                            size = parts[2]
+                            desc = parts[3]
+                            fields = parts[4]
+                            access = parts[5]
+                            self.registers.append(Register(name, size, desc, fields, access))
+                #self.registers_table.clear()
                 self.update_register_table()
                 self.output_label.setText(f"Project loaded from '{filename}'")
     
@@ -233,9 +249,9 @@ class RegisterMapGUI(QMainWindow):
     def update_register_table(self):
         # Iterate through 'nested' list to find length
         reg_list_length = 0
-        for register in self.registers:
-            if type(register) is Block:
-                for reg in register.registers:
+        for item in self.registers:
+            if type(item) is Block:
+                for reg in item.registers:
                     reg_list_length = reg_list_length + 1
             else:
                 reg_list_length = reg_list_length + 1
@@ -243,9 +259,9 @@ class RegisterMapGUI(QMainWindow):
         self.registers_table.setRowCount(reg_list_length)
 
         line = 0
-        for register in self.registers:
-            if type(register) is Block:
-                for reg in register.registers:
+        for item in self.registers:
+            if type(item) is Block:
+                for reg in item.registers:
                     #reg.print_reg()
                     self.registers_table.setItem(line, 0, QTableWidgetItem(str(line)))  # Address
                     self.registers_table.setItem(line, 1, QTableWidgetItem(reg.name))
@@ -256,11 +272,11 @@ class RegisterMapGUI(QMainWindow):
                     line = line + 1
             else:
                 self.registers_table.setItem(line, 0, QTableWidgetItem(str(line)))  # Address
-                self.registers_table.setItem(line, 1, QTableWidgetItem(register.name))
-                self.registers_table.setItem(line, 2, QTableWidgetItem(str(register.size)))
-                self.registers_table.setItem(line, 3, QTableWidgetItem(register.desc))
-                self.registers_table.setItem(line, 4, QTableWidgetItem(str(register.fields)))
-                self.registers_table.setItem(line, 5, QTableWidgetItem(str(register.access)))
+                self.registers_table.setItem(line, 1, QTableWidgetItem(item.name))
+                self.registers_table.setItem(line, 2, QTableWidgetItem(str(item.size)))
+                self.registers_table.setItem(line, 3, QTableWidgetItem(item.desc))
+                self.registers_table.setItem(line, 4, QTableWidgetItem(str(item.fields)))
+                self.registers_table.setItem(line, 5, QTableWidgetItem(str(item.access)))
                 line = line + 1
 
     def delete_selected(self):
