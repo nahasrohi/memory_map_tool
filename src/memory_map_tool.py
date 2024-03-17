@@ -245,15 +245,22 @@ class RegisterMapGUI(QMainWindow):
     #             self.registers_table.setItem(i+offset, 5, QTableWidgetItem(str(register.access)))
             
     def update_register_table(self):
-        self.registers_table.setRowCount(len(self.registers))
-        offset = 0
+        # Iterate through 'nested' list to find length
+        reg_list_length = 0
+        for register in self.registers:
+            if type(register) is Block:
+                for reg in register.registers:
+                    reg_list_length = reg_list_length + 1
+            else:
+                reg_list_length = reg_list_length + 1
+
+        self.registers_table.setRowCount(reg_list_length)
+
         line = 0
         for register in self.registers:
             if type(register) is Block:
                 for reg in register.registers:
-                    print('block found')
-                    #print(j+i)
-                    reg.print_reg()
+                    #reg.print_reg()
                     self.registers_table.setItem(line, 0, QTableWidgetItem(str(line)))  # Address
                     self.registers_table.setItem(line, 1, QTableWidgetItem(reg.name))
                     self.registers_table.setItem(line, 2, QTableWidgetItem(str(reg.size)))
