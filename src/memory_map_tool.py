@@ -4,6 +4,7 @@ from PyQt5 import QtCore as qtc
 import ast
 
 
+
 class Block:
     def __init__(self, name, desc):
         self.name = name
@@ -226,6 +227,14 @@ class RegisterMapGUI(QMainWindow):
         self.delete_button.clicked.connect(self.delete_selected)
         self.button_layout.addWidget(self.delete_button)
 
+        self.move_up_btn = QPushButton("Move Up")
+        self.move_up_btn.clicked.connect(self.move_up)
+        self.button_layout.addWidget(self.move_up_btn)
+
+        self.move_down_btn = QPushButton("Move Down")
+        self.move_down_btn.clicked.connect(self.move_down)
+        self.button_layout.addWidget(self.move_down_btn)
+
         self.btn_save_project = QPushButton("Save Project")
         self.btn_save_project.clicked.connect(self.save_project)
         self.button_layout.addWidget(self.btn_save_project)
@@ -298,9 +307,76 @@ class RegisterMapGUI(QMainWindow):
         for index in sorted(selected_indexes, key=lambda x: x.row(), reverse=True):
             print('paste index.row() =  {}'.format(index.row()))
             row = index.row()
-            break
+            break #TODO: Can't figure out how to just get the first index.row() so just breaking for now
         for reg in self.copied_regs:
             self.registers.insert(row,reg)
+        self.update_register_table()
+
+    def move_up_old(self):
+        row_idxs = []
+        selected_indexes = self.registers_table.selectionModel().selectedRows()
+        for index in sorted(selected_indexes, key=lambda x: x.row(), reverse=False):
+            row_idxs.append(index.row())
+        print('# Rows Selected: {}'.format(len(row_idxs)))
+        if len(row_idxs) > 1:
+            #print('row_idxs: {}'.format(row_idxs))
+            #row_idxs.reverse()
+            print('row_idxs: {}'.format(row_idxs))
+            first_idx = row_idxs[0]
+            last_idx = first_idx + len(row_idxs) - 1
+            print("first_idx = {} last_idx = {}".format(first_idx,last_idx))
+            item_copy = self.registers[first_idx-1]
+            print('Printing Original Order')
+            for item in self.registers:
+                print(item.name)
+            for i in range(first_idx-1,last_idx):
+                print(i)
+                self.registers[i] = self.registers[i+1]
+            self.registers[last_idx] = item_copy
+            print('Printing New Order')
+            for item in self.registers:
+                print(item.name)
+        else:
+            self.registers[row_idxs[0]], self.registers[row_idxs[0]-1] = self.registers[row_idxs[0]-1] , self.registers[row_idxs[0]]
+        
+        self.update_register_table()
+
+    def move_up(self):
+        row_idxs = []
+        selected_indexes = self.registers_table.selectionModel().selectedRows()
+        for index in sorted(selected_indexes, key=lambda x: x.row(), reverse=False):
+            row_idxs.append(index.row())
+        print('# Rows Selected: {}'.format(len(row_idxs)))
+        print('row_idxs: {}'.format(row_idxs))
+        if len(row_idxs) > 1: # multi-row
+            first_idx = row_idxs[0]
+            last_idx = first_idx + len(row_idxs) - 1
+            print("first_idx = {} last_idx = {}".format(first_idx,last_idx))
+            item_copy = self.registers[first_idx-1]
+            del self.registers[first_idx-1]
+            self.registers.insert(last_idx,item_copy)
+        else: # single row
+            self.registers[row_idxs[0]], self.registers[row_idxs[0]-1] = self.registers[row_idxs[0]-1] , self.registers[row_idxs[0]]
+        
+        self.update_register_table()
+
+    def move_down(self):
+        row_idxs = []
+        selected_indexes = self.registers_table.selectionModel().selectedRows()
+        for index in sorted(selected_indexes, key=lambda x: x.row(), reverse=False):
+            row_idxs.append(index.row())
+        print('# Rows Selected: {}'.format(len(row_idxs)))
+        print('row_idxs: {}'.format(row_idxs))
+        if len(row_idxs) > 1: # multi-row
+            first_idx = row_idxs[0]
+            last_idx = first_idx + len(row_idxs) - 1
+            print("first_idx = {} last_idx = {}".format(first_idx,last_idx))
+            item_copy = self.registers[last_idx+1]
+            del self.registers[last_idx+1]
+            self.registers.insert(first_idx,item_copy)
+        else: # single row
+            self.registers[row_idxs[0]], self.registers[row_idxs[0]+1] = self.registers[row_idxs[0]+1] , self.registers[row_idxs[0]]
+        
         self.update_register_table()
 
 class AddRegisterDialog(QDialog):
