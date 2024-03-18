@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QFileDialog, QMainWindow, QVBoxLayout, QWidget, QLabel, QLineEdit, QPushButton, QHBoxLayout, QTableWidget, QTableWidgetItem, QDialog
+from PyQt5.QtWidgets import QAbstractItemView, QApplication, QFileDialog, QMainWindow, QVBoxLayout, QWidget, QLabel, QLineEdit, QPushButton, QHBoxLayout, QTableWidget, QTableWidgetItem, QDialog
 from PyQt5 import QtCore as qtc
 import ast
 
@@ -312,35 +312,6 @@ class RegisterMapGUI(QMainWindow):
             self.registers.insert(row,reg)
         self.update_register_table()
 
-    def move_up_old(self):
-        row_idxs = []
-        selected_indexes = self.registers_table.selectionModel().selectedRows()
-        for index in sorted(selected_indexes, key=lambda x: x.row(), reverse=False):
-            row_idxs.append(index.row())
-        print('# Rows Selected: {}'.format(len(row_idxs)))
-        if len(row_idxs) > 1:
-            #print('row_idxs: {}'.format(row_idxs))
-            #row_idxs.reverse()
-            print('row_idxs: {}'.format(row_idxs))
-            first_idx = row_idxs[0]
-            last_idx = first_idx + len(row_idxs) - 1
-            print("first_idx = {} last_idx = {}".format(first_idx,last_idx))
-            item_copy = self.registers[first_idx-1]
-            print('Printing Original Order')
-            for item in self.registers:
-                print(item.name)
-            for i in range(first_idx-1,last_idx):
-                print(i)
-                self.registers[i] = self.registers[i+1]
-            self.registers[last_idx] = item_copy
-            print('Printing New Order')
-            for item in self.registers:
-                print(item.name)
-        else:
-            self.registers[row_idxs[0]], self.registers[row_idxs[0]-1] = self.registers[row_idxs[0]-1] , self.registers[row_idxs[0]]
-        
-        self.update_register_table()
-
     def move_up(self):
         row_idxs = []
         selected_indexes = self.registers_table.selectionModel().selectedRows()
@@ -355,9 +326,14 @@ class RegisterMapGUI(QMainWindow):
             item_copy = self.registers[first_idx-1]
             del self.registers[first_idx-1]
             self.registers.insert(last_idx,item_copy)
+            # Highlight moved rows
+            self.registers_table.setSelectionMode(QAbstractItemView.MultiSelection)
+            self.registers_table.selectRow(first_idx-1) # Un-Highlight first row
+            self.registers_table.selectRow(last_idx) # Highlight moved row
+            self.registers_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         else: # single row
             self.registers[row_idxs[0]], self.registers[row_idxs[0]-1] = self.registers[row_idxs[0]-1] , self.registers[row_idxs[0]]
-        
+            self.registers_table.selectRow(row_idxs[0]-1) # Highlight moved row
         self.update_register_table()
 
     def move_down(self):
@@ -374,10 +350,17 @@ class RegisterMapGUI(QMainWindow):
             item_copy = self.registers[last_idx+1]
             del self.registers[last_idx+1]
             self.registers.insert(first_idx,item_copy)
+            # Highlight moved rows
+            self.registers_table.setSelectionMode(QAbstractItemView.MultiSelection)
+            self.registers_table.selectRow(first_idx) # Un-Highlight first row
+            self.registers_table.selectRow(last_idx+1) # Highlight moved row
+            self.registers_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         else: # single row
             self.registers[row_idxs[0]], self.registers[row_idxs[0]+1] = self.registers[row_idxs[0]+1] , self.registers[row_idxs[0]]
-        
+            self.registers_table.selectRow(row_idxs[0]+1) # Highlight moved row
         self.update_register_table()
+        
+        
 
 class AddRegisterDialog(QDialog):
     def __init__(self):
