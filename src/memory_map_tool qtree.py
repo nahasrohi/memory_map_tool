@@ -4,9 +4,20 @@ from PyQt5 import QtCore
 
 import sys
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QTreeView, QVBoxLayout,
+    QApplication, QMainWindow, QTreeView, QTableView, QVBoxLayout, QSplitter, QTableWidget,QListView,
     QWidget, QPushButton, QDialog, QFormLayout, QLineEdit, QDialogButtonBox, QMessageBox, QHBoxLayout
 )
+
+#### Parking Lot ####
+#Set Data
+#item.setData('test_data', QtCore.Qt.EditRole)
+#tem_child.setData(str(hex(addr)), QtCore.Qt.EditRole)
+#Get Data
+#print(item_child.data(QtCore.Qt.EditRole))
+
+#self.tree_view.sortByColumn(1, QtCore.Qt.AscendingOrder)
+
+#######################
 
 class AddRegisterDialog(QDialog):
     def __init__(self, parent=None):
@@ -40,18 +51,35 @@ class RegisterMapGUI(QMainWindow):
         self.setWindowTitle("FPGA Register Map GUI")
         self.setGeometry(100, 100, 800, 600)
 
+        self.splitter =  QSplitter()
         # Create a QTreeView
         self.tree_view = QTreeView()
-        self.setCentralWidget(self.tree_view)
+        #self.setCentralWidget(self.tree_view)
+
+        # Create a QTableView
+        self.field_view = QTableView()
+        self.field_view.hideColumn(0)
+        #self.setCentralWidget(self.field_view)
+
+        self.field_table = QTableWidget()
+        self.field_table.setColumnCount(32)
+        #self.field_table.setHorizontalHeaderLabels(["F31","F30","F29","F28","F27"])
+
+        self.splitter.addWidget(self.tree_view)
+        self.splitter.addWidget(self.field_view)
+        self.splitter.setOrientation(QtCore.Qt.Vertical)
 
         # Create a QStandardItemModel
         self.model = QStandardItemModel()
-        self.model.setHorizontalHeaderLabels(["Name", "Address", "Type", "Description"])
+        header_list = ["Name", "Address", "Type", "Description"]
+        for i in reversed(range(32)):
+            header_list.append('F' + str(i))
+        self.model.setHorizontalHeaderLabels(header_list)
         self.tree_view.setModel(self.model)
+        self.field_view.setModel(self.model)
+        
 
         # Add buttons for adding and deleting registers/blocks
-        self.add_register_button = QPushButton("Add Register")
-        self.add_register_button.clicked.connect(self.add_register_clicked)
         self.delete_button = QPushButton("Delete")
         self.delete_button.clicked.connect(self.delete_clicked)
         self.insert_reg_button = QPushButton("Insert Reg")
@@ -64,21 +92,27 @@ class RegisterMapGUI(QMainWindow):
         self.move_up_button.clicked.connect(self.move_up)
         self.move_down_button = QPushButton("Move Down")
         self.move_down_button.clicked.connect(self.move_down)
+        self.set_field_btn = QPushButton("Set Field")
+        self.set_field_btn.clicked.connect(self.set_field)
+        self.print_map_btn = QPushButton("Print Map")
+        self.print_map_btn.clicked.connect(self.print_map)
 
         # Layout for the buttons
         button_layout = QHBoxLayout()
-        button_layout.addWidget(self.add_register_button)
         button_layout.addWidget(self.delete_button)
         button_layout.addWidget(self.insert_reg_button)
         button_layout.addWidget(self.insert_block_button)
         button_layout.addWidget(self.update_addr_button)
         button_layout.addWidget(self.move_up_button)
         button_layout.addWidget(self.move_down_button)
+        button_layout.addWidget(self.set_field_btn)
+        button_layout.addWidget(self.print_map_btn)
 
         # Main layout
         main_layout = QVBoxLayout()
         main_layout.addLayout(button_layout)
-        main_layout.addWidget(self.tree_view)
+        main_layout.addWidget(self.splitter)
+        #main_layout.addWidget(self.field_view)
 
         central_widget = QWidget()
         central_widget.setLayout(main_layout)
@@ -88,14 +122,13 @@ class RegisterMapGUI(QMainWindow):
         #self.tree_view.setDragEnabled(True)
         #self.tree_view.setAcceptDrops(True)
 
-        # Add example data
-        self.add_register("Register1", "1", "Register")
-        # self.add_register("Register2", "4", "Register")
-        # self.add_register("Register3", "3", "Register")
-        # self.add_register_block("Block1", [
-        #     ("BlockReg1", "9", "2"),
-        #     ("BlockReg2", "0", "4"),
-        # ])
+        #self.field_view.hideColumn(0)
+        self.field_view.hideColumn(1)
+        self.field_view.hideColumn(2)
+        self.field_view.hideColumn(3)
+        for i in range(4, 32+4):
+            self.tree_view.hideColumn(i)
+            self.field_view.setColumnWidth(i, 30)
 
     def add_register_clicked(self):
         dialog = AddRegisterDialog(self)
@@ -125,14 +158,28 @@ class RegisterMapGUI(QMainWindow):
     def loop_children(self, item, row_idx, addr):
         if item.hasChildren():
             for row in range(item.rowCount()):
-                item_child = item.child(row,1)
-                self.loop_children(item_child, row_idx, addr)
-                item_child.setData(str(hex(addr)), QtCore.Qt.EditRole)
-                print("setting addr of child")
-                addr = addr + 32
-            row_idx = row_idx + 1
-            return addr, row_idx
+                item_child_addr = item.child(row,1) #need names and addrs here TODO
+                item_child = item.child(row,0) #need names and addrs here TODO
+                if item_child.hasChildren():
+                    self.loop_children(item_child, row_idx, addr)
+                    #print(item_child.data(QtCore.Qt.EditRole))
+                else:
+                    item_child_addr.setData(str(hex(addr)), QtCore.Qt.EditRole)
+                    print("setting addr of child {} to {}".format(item_child.data(QtCore.Qt.EditRole), hex(addr)))
+                    #print(item_child.data(QtCore.Qt.EditRole))
+                    addr = addr + 32
+        row_idx = row_idx + 1
+        return addr, row_idx
         
+    def set_field(self):
+        indexes = self.field_view.selectedIndexes()
+        print("table indexes len = {}".format(len(indexes)))
+        item = self.model.itemFromIndex(indexes[0])
+        actual_row = item.row()
+        start_col = item.column()
+
+        self.field_view.setSpan(actual_row, start_col, 1, len(indexes))
+        print("col span = {}".format(self.field_view.columnSpan(actual_row, 5)))
     
     def update_addr(self):
         row_idx = 0
@@ -147,7 +194,7 @@ class RegisterMapGUI(QMainWindow):
                 if item.hasChildren():
                     #print('child')
                     addr, row_idx = self.loop_children(item, row_idx, addr)
-                    print(addr)
+                    print(hex(addr))
                     print(row_idx)
                     # for row in range(item.rowCount()):
                     #     item_child = item.child(row,1)
@@ -164,28 +211,22 @@ class RegisterMapGUI(QMainWindow):
 
     def insert_block_clicked(self):
         indexes = self.tree_view.selectedIndexes()
-        # for index in indexes:
-        print(indexes)
-        item = self.model.itemFromIndex(indexes[0])
-        print(item.data(QtCore.Qt.EditRole))
-        block_row = item.row()
-        #print(block_row)
-        #find top block row index
-        while True:
-            if type(item.parent()) is type(None):
-                break
-            else:
-                print(type(item))
-                item = item.parent()
+        if len(indexes) != 0:
+            item = self.model.itemFromIndex(indexes[0])
+            actual_row = item.row()
+            while True:
+                if type(item.parent()) is type(None):
+                    break
+                else:
+                    print(type(item))
+                    item = item.parent()
+        else:
+            actual_row = 0
 
-        actual_row = item.row()
-        #print(actual_row)
         new_block = ['newblock', '0', 'Block', 'New Block']
-        testrow = [QStandardItem(field) for field in (new_block)]
+        blockrow = [QStandardItem(field) for field in (new_block)]
         # for item in testrow:
         #     item.setDropEnabled(False)
-        # for item in testrow:
-        #     item.setData('test_data', QtCore.Qt.EditRole)
         
         #insert initial template reg into block
         new_reg = ['newreg', '0', 'Register', 'New Register']
@@ -193,103 +234,69 @@ class RegisterMapGUI(QMainWindow):
         for item in regrow:
             item.setDropEnabled(False)
             #item.setDragEnabled(False)
-        testrow[0].appendRow(regrow)
-        self.model.insertRow(actual_row,testrow)
-        #self.tree_view.sortByColumn(1, QtCore.Qt.AscendingOrder)
+        blockrow[0].appendRow(regrow)
+        self.model.insertRow(actual_row,blockrow)
         self.update_addr()
 
     def insert_reg_clicked(self):
         indexes = self.tree_view.selectedIndexes()
-        # for index in indexes:
-        print(indexes)
-        item = self.model.itemFromIndex(indexes[0])
-        item_type = self.model.itemFromIndex(indexes[2]).data(QtCore.Qt.EditRole)
-        block_row = item.row()
-        print(block_row)
+        item_type = 'Register'
+        if len(indexes) != 0:
+            item = self.model.itemFromIndex(indexes[0])
+            item_type = self.model.itemFromIndex(indexes[2]).data(QtCore.Qt.EditRole)
+            selected_row = item.row()
+        else:
+            selected_row = 0
 
-        actual_row = item.row()
-        print(actual_row)
+        new_reg = ['newreg', '0', 'Register', 'New Register', 'reserved']
+        regrow = [QStandardItem(field) for field in (new_reg)]
 
-        new_reg = ['newreg', '0', 'Register', 'New Register']
-        testrow = [QStandardItem(field) for field in (new_reg)]
-        for item in testrow:
+        # Commenting this out allows adding reg into block with button TODO: Fix this
+        for item in regrow:
             item.setDropEnabled(False)
 
         if item_type == 'Block':
-            item.appendRow(testrow)
+            item.appendRow(regrow)
         else:
-            self.model.insertRow(actual_row,testrow)
+            self.model.insertRow(selected_row,regrow)
 
-        self.update_addr()
-            
+        self.update_addr()        
 
     def delete_clicked(self):
         indexes = self.tree_view.selectedIndexes()
-        # for index in indexes:
-        print(indexes)
-        item = self.model.itemFromIndex(indexes[0])
-        block_row = item.row()
-        print(block_row)
-        #find top block row index
+        if len(indexes) != 0:
+            item = self.model.itemFromIndex(indexes[0])
+            item_type = self.model.itemFromIndex(indexes[2]).data(QtCore.Qt.EditRole)
+            selected_row = item.row()
+            self.model.removeRow(selected_row)
+
+    def print_map(self):
+        print("Printing Register Map")
+        row_idx = 0
+        addr = 0
         while True:
-            if type(item.parent()) is type(None):
-                break
+            item = self.model.item(row_idx,0)
+            item_addr = self.model.item(row_idx,1)
+            if type(item) is not type(None):
+                print(item.data(QtCore.Qt.EditRole))  
+                if item.hasChildren():
+                    print('child')
+                    break
+                    # addr, row_idx = self.loop_children(item, row_idx, addr)
+                    # print(hex(addr))
+                    # print(row_idx)
+                    # for row in range(item.rowCount()):
+                    #     item_child = item.child(row,1)
+                    #     item_child.setData(str(hex(addr)), QtCore.Qt.EditRole)
+                    #     addr = addr + 32
+                    row_idx = row_idx + 1
+                else:
+                    row_idx = row_idx + 1
             else:
-                print(type(item))
-                item = item.parent()
-
-        actual_row = item.row()
-        print(actual_row)
-
-        testrow = QStandardItem('testrow')
-        #self.model.insertRow(actual_row,testrow)
-        item.appendRow(testrow)
+                #print("No more items")
+                break
 
 
-        # if not indexes:
-        #     return
-
-        # # Store references to selected items
-        # selected_items = []
-        # for index in indexes:
-        #     item = self.model.itemFromIndex(index)
-        #     if item and item not in selected_items:
-        #         selected_items.append(item)
-
-        # # Delete selected items
-        # for item in selected_items:
-        #     parent_item = item.parent()
-        #     if parent_item:
-        #         parent_item.removeRow(item.row())
-        #     else:
-        #         self.model.removeRow(item.row())
-
-
-    def add_register(self, name, address, size):
-        row = [QStandardItem(field) for field in (name, address, size)]
-        for item in row:
-            item.setDropEnabled(False)
-        #print(len(row))
-        self.model.appendRow(row)
-
-    def insert_register(self, name, address, size):
-        testrow = QStandardItem('testrow')
-        print(len(row))
-        self.model.appendRow(row)
-
-    def add_register_block(self, name, registers):
-        block_item = QStandardItem(name)
-        block_addr = QStandardItem(str(registers[0][1]))
-        #self.model.appendRow([block_item,block_addr])
-        #block_item.setChild(0,0,block_addr)
-        #block_item = self.model.findItems("Block1")
-        #print(block_item)
-        for register in registers:
-            row = [QStandardItem(field) for field in register]
-            block_item.appendRow(row)
-        self.model.appendRow([block_item,block_addr])
-        #testrow = QStandardItem('testrow')
-        #self.model.insertRow(2,testrow)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
