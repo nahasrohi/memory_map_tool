@@ -17,6 +17,17 @@ from PyQt5.QtWidgets import (
 
 #self.tree_view.sortByColumn(1, QtCore.Qt.AscendingOrder)
 
+# def iterItems(self, root):
+#     def recurse(parent):
+#         for row in range(parent.rowCount()):
+#             for column in range(parent.columnCount()):
+#                 child = parent.child(row, column)
+#                 yield child
+#                 if child.hasChildren():
+#                     yield from recurse(child)
+#     if root is not None:
+#         yield from recurse(root)
+
 #######################
 
 class AddRegisterDialog(QDialog):
@@ -165,7 +176,7 @@ class RegisterMapGUI(QMainWindow):
                     #print(item_child.data(QtCore.Qt.EditRole))
                 else:
                     item_child_addr.setData(str(hex(addr)), QtCore.Qt.EditRole)
-                    print("setting addr of child {} to {}".format(item_child.data(QtCore.Qt.EditRole), hex(addr)))
+                    #print("setting addr of child {} to {}".format(item_child.data(QtCore.Qt.EditRole), hex(addr)))
                     #print(item_child.data(QtCore.Qt.EditRole))
                     addr = addr + 32
         row_idx = row_idx + 1
@@ -194,8 +205,8 @@ class RegisterMapGUI(QMainWindow):
                 if item.hasChildren():
                     #print('child')
                     addr, row_idx = self.loop_children(item, row_idx, addr)
-                    print(hex(addr))
-                    print(row_idx)
+                    #print(hex(addr))
+                    #print(row_idx)
                     # for row in range(item.rowCount()):
                     #     item_child = item.child(row,1)
                     #     item_child.setData(str(hex(addr)), QtCore.Qt.EditRole)
@@ -270,7 +281,7 @@ class RegisterMapGUI(QMainWindow):
             selected_row = item.row()
             self.model.removeRow(selected_row)
 
-    def print_map(self):
+    def print_map2(self):
         print("Printing Register Map")
         row_idx = 0
         addr = 0
@@ -279,9 +290,12 @@ class RegisterMapGUI(QMainWindow):
             item_addr = self.model.item(row_idx,1)
             if type(item) is not type(None):
                 print(item.data(QtCore.Qt.EditRole))  
-                if item.hasChildren():
+                parent = item
+                while item.hasChildren():
                     print('child')
-                    break
+                    item = item.child(row_idx+1,0)
+                    row_idx = row_idx + 1
+                    
                     # addr, row_idx = self.loop_children(item, row_idx, addr)
                     # print(hex(addr))
                     # print(row_idx)
@@ -289,12 +303,37 @@ class RegisterMapGUI(QMainWindow):
                     #     item_child = item.child(row,1)
                     #     item_child.setData(str(hex(addr)), QtCore.Qt.EditRole)
                     #     addr = addr + 32
-                    row_idx = row_idx + 1
+                    
                 else:
                     row_idx = row_idx + 1
             else:
                 #print("No more items")
                 break
+
+    def print_map(self):
+        root = self.model.invisibleRootItem()
+        for item in self.iterItems(root):
+            print("iter")
+            pass
+            #print(item.text())
+
+    def iterItems(self, root):
+        def recurse(parent, addr):
+            for row in range(parent.rowCount()):
+                #for column in range(parent.columnCount()):
+                child = parent.child(row, 0)
+                child_addr = parent.child(row, 1)
+                child_br = parent.child(row, 2)
+                yield child
+                if child_br.text() != "Block":
+                    child_addr.setData(str(hex(addr)), QtCore.Qt.EditRole)
+                    addr = addr + 32
+                    print(child.text()) #Added by IS
+                if child.hasChildren():
+                    yield from recurse(child,addr)
+        if root is not None:
+            addr = 0
+            yield from recurse(root, addr)
 
 
 
