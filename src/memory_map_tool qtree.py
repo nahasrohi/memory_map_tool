@@ -4,7 +4,7 @@ from PyQt5 import QtCore
 
 import sys
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QTreeView, QTableView, QVBoxLayout, QSplitter, QTableWidget,QListView,
+    QFileDialog, QApplication, QMainWindow, QTreeView, QTableView, QVBoxLayout, QSplitter, QTableWidget,QListView,
     QWidget, QPushButton, QDialog, QFormLayout, QLineEdit, QDialogButtonBox, QMessageBox, QHBoxLayout
 )
 
@@ -107,6 +107,10 @@ class RegisterMapGUI(QMainWindow):
         self.set_field_btn.clicked.connect(self.set_field)
         self.print_map_btn = QPushButton("Print Map")
         self.print_map_btn.clicked.connect(self.print_map)
+        self.save_btn = QPushButton("Save")
+        self.save_btn.clicked.connect(self.save_model)
+        self.load_btn = QPushButton("Load")
+        self.load_btn.clicked.connect(self.load_model)
 
         # Layout for the buttons
         button_layout = QHBoxLayout()
@@ -118,6 +122,8 @@ class RegisterMapGUI(QMainWindow):
         button_layout.addWidget(self.move_down_button)
         button_layout.addWidget(self.set_field_btn)
         button_layout.addWidget(self.print_map_btn)
+        button_layout.addWidget(self.save_btn)
+        button_layout.addWidget(self.load_btn)
 
         # Main layout
         main_layout = QVBoxLayout()
@@ -130,6 +136,7 @@ class RegisterMapGUI(QMainWindow):
         self.setCentralWidget(central_widget)
 
         self.tree_view.setDragDropMode(4)
+        #self.tree_view.setIndentation(1)
         #self.tree_view.setDragEnabled(True)
         #self.tree_view.setAcceptDrops(True)
 
@@ -138,7 +145,7 @@ class RegisterMapGUI(QMainWindow):
         self.field_view.hideColumn(2)
         self.field_view.hideColumn(3)
         for i in range(4, 32+4):
-            self.tree_view.hideColumn(i)
+            #self.tree_view.hideColumn(i)
             self.field_view.setColumnWidth(i, 30)
 
     def add_register_clicked(self):
@@ -235,17 +242,27 @@ class RegisterMapGUI(QMainWindow):
             actual_row = 0
 
         new_block = ['newblock', '0', 'Block', 'New Block']
+        for i in range(4, 32+3):
+           new_block.append('') 
         blockrow = [QStandardItem(field) for field in (new_block)]
-        # for item in testrow:
+        # for item in blockrow:
         #     item.setDropEnabled(False)
         
         #insert initial template reg into block
         new_reg = ['newreg', '0', 'Register', 'New Register']
+        for i in range(4, 32+3):
+           new_reg.append('') 
         regrow = [QStandardItem(field) for field in (new_reg)]
         for item in regrow:
             item.setDropEnabled(False)
-            #item.setDragEnabled(False)
+        #regrow[0].setDropEnabled(False)
+        
         blockrow[0].appendRow(regrow)
+        blockrow[0].setDropEnabled(False)
+        blockrow[0].setDragEnabled(True)
+        # for item in blockrow:
+        #      item.setDragEnabled(False)
+        
         self.model.insertRow(actual_row,blockrow)
         self.update_addr()
 
@@ -260,11 +277,13 @@ class RegisterMapGUI(QMainWindow):
             selected_row = 0
 
         new_reg = ['newreg', '0', 'Register', 'New Register', 'reserved']
+        for i in range(4, 32+3):
+           new_reg.append('') 
         regrow = [QStandardItem(field) for field in (new_reg)]
 
         # Commenting this out allows adding reg into block with button TODO: Fix this
-        for item in regrow:
-            item.setDropEnabled(False)
+        for item_i in regrow:
+             item_i.setDropEnabled(False)
 
         if item_type == 'Block':
             item.appendRow(regrow)
@@ -312,9 +331,12 @@ class RegisterMapGUI(QMainWindow):
 
     def print_map(self):
         root = self.model.invisibleRootItem()
-        for item in self.iterItems(root):
-            print("iter")
-            pass
+        parent_list = []
+        self.new_recurse(root, parent_list)
+
+        # for item in self.iterItems(root):
+        #     print("iter")
+        #     pass
             #print(item.text())
 
     def iterItems(self, root):
@@ -324,16 +346,70 @@ class RegisterMapGUI(QMainWindow):
                 child = parent.child(row, 0)
                 child_addr = parent.child(row, 1)
                 child_br = parent.child(row, 2)
-                yield child
                 if child_br.text() != "Block":
                     child_addr.setData(str(hex(addr)), QtCore.Qt.EditRole)
                     addr = addr + 32
                     print(child.text()) #Added by IS
+                yield child
                 if child.hasChildren():
                     yield from recurse(child,addr)
         if root is not None:
             addr = 0
             yield from recurse(root, addr)
+
+    def save_model(self):
+        #filename, _ = QFileDialog.getSaveFileName(self, "Save Project", "", "Project Files (*.proj)")
+        save_model = self.model
+        file = QtCore.QFile('model.dat')
+        if not file.open(QtCore.QIODevice.WriteOnly):
+            return False
+        stream = QtCore.QDataStream(file)
+        self.save_item_recursive(self.model.invisibleRootItem(), stream)
+        file.close()
+        return True
+    
+    def save_item_recursive(self, item, stream):
+        stream.writeQString(item.text())
+        stream.writeInt(item.rowCount())
+        for row in range(item.rowCount()):
+            for column in range(item.columnCount()):
+                child = item.child(row, column)
+                if child is not None:
+                    self.save_item_recursive(child, stream)
+
+    def load_model(self):
+        file = QtCore.QFile('model.dat')
+        if not file.open(QtCore.QIODevice.ReadOnly):
+            return self.model
+        stream = QtCore.QDataStream(file)
+        self.load_item_recursive(self.model, self.model.invisibleRootItem(), stream)
+        file.close()
+
+    def load_item_recursive(self, model, parent_item, stream):
+        text = stream.readQString()
+        item = QStandardItem(text)
+        parent_item.appendRow(item)
+        num_children = stream.readInt()
+        for _ in range(num_children):
+            self.load_item_recursive(model, item, stream)
+
+    def new_recurse(self, parent, parent_list):
+        for row in range(parent.rowCount()):
+            print("row {}".format(row))
+            child = parent.child(row, 0)
+            row_list = []
+            print("col_count {}".format(parent.columnCount()))
+            for col in range(1,parent.columnCount()):
+                if type(parent.child(row, col)) is not type(None):
+                    print("col_text {}".format(parent.child(row, col).text()))
+                    row_list.append(parent.child(row, col).text())
+                else:
+                    row_list.append('')
+            print("finished row")
+            parent_list.append(row_list)
+            if parent.hasChildren():
+                self.new_recurse(child, parent_list)
+
 
 
 
